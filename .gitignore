@@ -23,6 +23,7 @@ build_log_*.txt
 # Java
 *.class
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 *.war
 *.ear
 
