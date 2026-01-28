@@ -20,12 +20,47 @@
 ---
 
 ## 📦 Installation
+JFR-Tail is published to **GitHub Packages**. You must configure authentication to download it.
 
-1.  **Build the project**:
-    ```bash
-    ./gradlew assemble
-    ```
-    *Output:* `cli/build/libs/cli-1.0-SNAPSHOT.jar` and `agent/build/libs/agent-1.0-SNAPSHOT.jar`.
+### Maven
+Add the repository and dependency to `pom.xml`.
+
+**Settings (`~/.m2/settings.xml`) or Repository Config:**
+```xml
+<repositories>
+    <repository>
+        <id>github</id>
+        <url>https://maven.pkg.github.com/murilonerdx/jfr-tail</url>
+    </repository>
+</repositories>
+```
+
+**Dependency:**
+```xml
+<dependency>
+    <groupId>io.jfrtail</groupId>
+    <artifactId>jfr-tail-spring-starter</artifactId>
+    <version>1.1.4</version>
+</dependency>
+```
+*Note: You must provide your GitHub Username and a PAT (Personal Access Token) with `read:packages` scope in your global `settings.xml` or environment variables for authentication.*
+
+### Gradle (Kotlin)
+```kotlin
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/murilonerdx/jfr-tail")
+        credentials {
+            username = System.getenv("GITHUB_ACTOR") ?: "YOUR_USERNAME"
+            password = System.getenv("GITHUB_TOKEN") ?: "YOUR_TOKEN"
+        }
+    }
+}
+
+dependencies {
+    implementation("io.jfrtail:jfr-tail-spring-starter:1.1.4")
+}
+```
 
 ---
 
