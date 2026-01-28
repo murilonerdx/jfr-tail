@@ -45,22 +45,83 @@ If you want to grant temporary access to a developer/SRE without sharing the mas
 
 ---
 
-## Spring Boot Integration (V3)
-JFR-Tail can integrate with Spring Boot Actuator to show Health Status and HTTP Metrics alongside JVM events.
+## Integration
 
-### Setup
-Ensure your Spring Boot App exposes Actuator:
+### Spring Boot Starter (Recommended)
+Add the dependency to your `pom.xml` or `build.gradle` to enable auto-configuration:
+
+#### Gradle
+```kotlin
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/murilonerdx/jfr-tail")
+        credentials {
+            username = "GITHUB_USERNAME"
+            password = "GITHUB_TOKEN"
+        }
+    }
+}
+
+dependencies {
+    implementation("io.jfrtail:jfr-tail-spring-starter:1.0.1")
+}
+```
+
+#### Maven
+```xml
+<repositories>
+    <repository>
+        <id>github</id>
+        <url>https://maven.pkg.github.com/murilonerdx/jfr-tail</url>
+        <snapshots><enabled>true</enabled></snapshots>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>io.jfrtail</groupId>
+        <artifactId>jfr-tail-spring-starter</artifactId>
+        <version>1.0.1</version>
+    </dependency>
+</dependencies>
+```
+
+#### Configuration (`application.yml`)
+The starter automatically initializes the JFR-Tail monitor. You can customize it:
+
+```yaml
+jfr-tail:
+  enabled: true       # Default true
+  web-port: 8081      # Default 8080 (Change if Boot uses 8080)
+  tcp-port: 7099      # Default 7099
+  secret: "your-shared-secret"
+```
+
+### Manual Setup (Non-Spring)
+If you are not using Spring Boot, you can still import the `agent` library:
+
+```xml
+<dependency>
+    <groupId>io.jfrtail</groupId>
+    <artifactId>agent</artifactId>
+    <version>1.0.1</version>
+</dependency>
+```
+And start it manually: `JfrTailMonitor.getInstance().start(webPort, tcpPort);`
+
+---
+
+## Spring Boot Actuator Insight
+JFR-Tail can correlate its data with Spring Boot Actuator metrics. Ensure your app exposes the endpoints:
 ```properties
 management.endpoints.web.exposure.include=health,metrics,threaddump,env
 ```
 
-### connecting with Spring & Security
+### Connecting CLI with Actuator
 ```bash
 jfr-tail connect \
-  --secret "my-safe-password" \
-  --actuator-url "http://localhost:8080/actuator" \
-  --actuator-user "admin" \  # Optional (if Actuator is protected)
-  --actuator-pass "secret"
+  --secret "your-shared-secret" \
+  --actuator-url "http://localhost:8080/actuator"
 ```
 
 ### TUI Navigation

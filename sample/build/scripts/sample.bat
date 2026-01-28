@@ -70,7 +70,7 @@ goto fail
 :execute
 @rem Setup the command line
 
-set CLASSPATH=%APP_HOME%\lib\sample-1.0-SNAPSHOT.jar;%APP_HOME%\lib\agent-1.0-SNAPSHOT.jar;%APP_HOME%\lib\common-1.0-SNAPSHOT.jar;%APP_HOME%\lib\jackson-annotations-2.15.2.jar;%APP_HOME%\lib\jackson-core-2.15.2.jar;%APP_HOME%\lib\jackson-datatype-jsr310-2.15.2.jar;%APP_HOME%\lib\jackson-databind-2.15.2.jar
+set CLASSPATH=%APP_HOME%\lib\sample.jar;%APP_HOME%\lib\agent.jar;%APP_HOME%\lib\common.jar;%APP_HOME%\lib\jackson-annotations-2.15.2.jar;%APP_HOME%\lib\jackson-core-2.15.2.jar;%APP_HOME%\lib\jackson-datatype-jsr310-2.15.2.jar;%APP_HOME%\lib\jackson-databind-2.15.2.jar
 
 
 @rem Execute sample

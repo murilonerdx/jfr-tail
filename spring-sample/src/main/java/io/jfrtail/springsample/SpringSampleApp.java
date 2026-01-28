@@ -1,6 +1,5 @@
 package io.jfrtail.springsample;
 
-import io.jfrtail.agent.api.JfrTailMonitor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,16 +13,6 @@ import java.util.Random;
 public class SpringSampleApp {
 
     public static void main(String[] args) {
-        // Initialize JFR-Tail Agent (Library Mode)
-        try {
-            // Check flag to avoid double start if using javaagent
-            if (System.getProperty("jfrtail.start") != null) {
-                JfrTailMonitor.getInstance().start(8081, 7099); // Web 8081 (conflict with Boot 8080), TCP 7099
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
         SpringApplication.run(SpringSampleApp.class, args);
     }
 
