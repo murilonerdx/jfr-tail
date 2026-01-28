@@ -1,9 +1,9 @@
-# 🦅 JFR-Tail
+# 🦅# JFR-Tail (v1.1.0)
 > **"Tail -f" for your JVM Flight Recorder events.**
 
 🇧🇷 [Leia em Português](README_PT.md)
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Version](https://img.shields.io/badge/version-4.0-purple)
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Version](https://img.shields.io/badge/version-1.1.0-purple)
 
 **JFR-Tail** brings visibility to your JVM in real-time without the heavy bloat of full APMs. It attaches to your running Java process, streams JFR events (GC, Locks, Exceptions), and presents them in a beautiful Terminal UI (TUI).
 
