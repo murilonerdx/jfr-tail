@@ -105,10 +105,14 @@ public class TuiManager {
                     PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
                     BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
 
+                initDebugLog();
+                logDebug("CLI Network Thread Started. Connected to " + host + ":" + port);
+
                 // AUTH HANDSHAKE
                 if (token != null) {
                     out.println("AUTH " + token);
                     String response = in.readLine();
+                    logDebug("Auth Response: " + response);
                     if (response != null && !response.startsWith("OK")) {
                         // Auth Failed
                         JfrEvent err = new JfrEvent();
@@ -121,10 +125,12 @@ public class TuiManager {
 
                 String line;
                 while (running && (line = in.readLine()) != null) {
+                    // logDebug("RCV: " + line); // Verbose
                     processEventLine(line);
                 }
             } catch (Exception e) {
-                // Log error
+                logDebug("Network Error: " + e.getMessage());
+                e.printStackTrace();
             }
         });
         networkThread.setDaemon(true);
@@ -258,9 +264,27 @@ public class TuiManager {
         eventsPerSecondHistory.clear();
     }
 
+    private PrintWriter debugLog;
+
+    private void initDebugLog() {
+        try {
+            debugLog = new PrintWriter(new FileWriter("debug-cli.log", true), true);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void logDebug(String msg) {
+        if (debugLog != null) {
+            debugLog.println(java.time.Instant.now() + " " + msg);
+        }
+    }
+
     private void cleanup() {
         if (fileWriter != null)
             fileWriter.close();
+        if (debugLog != null)
+            debugLog.close();
     }
 
     private void updateStats(JfrEvent event) {

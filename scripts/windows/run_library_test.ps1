@@ -18,7 +18,7 @@ $cliJar = "$rootDir\cli\build\libs\cli-1.0-SNAPSHOT.jar"
 # 2. Start Sample App (Library Mode)
 Write-Host "`n[2/4] Starting Sample App (Library Mode)..." -ForegroundColor Yellow
 Write-Host "-> This starts the JFR Tail Agent INTERNALLY via API." -ForegroundColor Gray
-$sampleProcess = Start-Process -FilePath "java" -ArgumentList "-Djfrtail.start=true", "-jar", $sampleJar -PassThru -NoNewWindow
+$sampleProcess = Start-Process -FilePath "java" -ArgumentList "-Djfrtail.start=true", "-Djfrtail.secret=simple-test", "-jar", $sampleJar -PassThru -NoNewWindow
 $samplePid = $sampleProcess.Id
 Write-Host "-> Sample App running with PID: $samplePid" -ForegroundColor Green
 
@@ -31,7 +31,7 @@ Write-Host "-> JSON Stats should be at: http://localhost:8080/jfr/stats" -Foregr
 
 try {
     # Use 'connect' command instead of 'attach'
-    java -jar $cliJar connect --port 7099
+    java -jar $cliJar connect --port 7099 --secret "simple-test"
 }
 catch {
     Write-Error "Failed to run JFR Tail CLI"
