@@ -24,6 +24,16 @@ public class JfrTailProperties {
      */
     private String secret;
 
+    /**
+     * Whether to enable the HTML Dashboard endpoint (/jfr/dashboard).
+     */
+    private boolean dashboardEnabled = true;
+
+    /**
+     * Whether to enable the JSON Stats endpoint (/jfr/stats).
+     */
+    private boolean statsEnabled = true;
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -54,5 +64,21 @@ public class JfrTailProperties {
 
     public void setSecret(String secret) {
         this.secret = secret;
+    }
+
+    public boolean isDashboardEnabled() {
+        return dashboardEnabled;
+    }
+
+    public void setDashboardEnabled(boolean dashboardEnabled) {
+        this.dashboardEnabled = dashboardEnabled;
+    }
+
+    public boolean isStatsEnabled() {
+        return statsEnabled;
+    }
+
+    public void setStatsEnabled(boolean statsEnabled) {
+        this.statsEnabled = statsEnabled;
     }
 }

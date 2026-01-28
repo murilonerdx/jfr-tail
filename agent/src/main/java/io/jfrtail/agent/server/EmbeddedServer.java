@@ -15,21 +15,34 @@ public class EmbeddedServer {
     private final int port;
     private final StatsManager statsManager;
     private final String secret;
+    private final boolean statsEnabled;
+    private final boolean dashboardEnabled;
     private HttpServer server;
 
-    public EmbeddedServer(int port, StatsManager statsManager, String secret) {
+    public EmbeddedServer(int port, StatsManager statsManager, String secret, boolean statsEnabled,
+            boolean dashboardEnabled) {
         this.port = port;
         this.statsManager = statsManager;
         this.secret = secret;
+        this.statsEnabled = statsEnabled;
+        this.dashboardEnabled = dashboardEnabled;
     }
 
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress(port), 0);
-        server.createContext("/jfr/stats", new AuthMiddleware(new StatsHandler()));
-        server.createContext("/jfr/dashboard", new AuthMiddleware(new DashboardHandler()));
+        if (statsEnabled) {
+            server.createContext("/jfr/stats", new AuthMiddleware(new StatsHandler()));
+        }
+        if (dashboardEnabled) {
+            server.createContext("/jfr/dashboard", new AuthMiddleware(new DashboardHandler()));
+        }
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
         System.out.println("[JfrTail] Embedded Server started on port " + port);
+        if (!statsEnabled)
+            System.out.println("[JfrTail] Stats endpoint is DISABLED");
+        if (!dashboardEnabled)
+            System.out.println("[JfrTail] Dashboard endpoint is DISABLED");
     }
 
     public void stop() {

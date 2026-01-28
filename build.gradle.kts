@@ -7,10 +7,9 @@ plugins {
     id("maven-publish")
 }
 
-group = "io.jfrtail"
-version = "1.2.0"
-
 allprojects {
+    group = "io.jfrtail"
+    version = "1.2.1"
     repositories {
         mavenCentral()
     }

@@ -26,7 +26,12 @@ public class JfrTailAutoConfiguration {
         }
 
         try {
-            JfrTailMonitor.getInstance().start(properties.getWebPort(), properties.getTcpPort());
+            JfrTailMonitor.getInstance().start(
+                    properties.getWebPort(),
+                    properties.getTcpPort(),
+                    properties.getSecret(),
+                    properties.isStatsEnabled(),
+                    properties.isDashboardEnabled());
             System.out.println("JFR-Tail Auto-configured: Web Port " + properties.getWebPort() + ", TCP Port "
                     + properties.getTcpPort());
         } catch (Exception e) {

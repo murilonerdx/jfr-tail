@@ -35,10 +35,15 @@ public class JfrTailMonitor {
     private String secret;
 
     public void start(int webPort, int tcpPort) throws IOException {
-        start(webPort, tcpPort, null);
+        start(webPort, tcpPort, null, true, true);
     }
 
     public void start(int webPort, int tcpPort, String secret) throws IOException {
+        start(webPort, tcpPort, secret, true, true);
+    }
+
+    public void start(int webPort, int tcpPort, String secret, boolean statsEnabled, boolean dashboardEnabled)
+            throws IOException {
         // 0. Security Setup
         if (secret == null || secret.isEmpty()) {
             // Check System Prop
@@ -54,7 +59,7 @@ public class JfrTailMonitor {
         this.secret = secret;
 
         // 1. Start Web Server
-        webServer = new EmbeddedServer(webPort, statsManager, secret);
+        webServer = new EmbeddedServer(webPort, statsManager, secret, statsEnabled, dashboardEnabled);
         webServer.start();
 
         // 2. Start TCP Server (for converting CLI)
