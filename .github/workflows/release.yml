@@ -1,0 +1,57 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Agent and CLI
+        run: ./gradlew :agent:assemble :cli:assemble -x test
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir out
+          cp agent/build/libs/agent-*.jar out/jfr-tail-agent.jar
+          cp cli/build/libs/cli-*.jar out/jfr-tail-cli.jar
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            out/jfr-tail-agent.jar
+            out/jfr-tail-cli.jar
+          name: JFR-Tail ${{ github.ref_name }}
+          body: |
+            Automated Release for ${{ github.ref_name }}
+            
+            ### Artifacts:
+            - **jfr-tail-agent.jar**: The java agent to be attached to your application.
+            - **jfr-tail-cli.jar**: The CLI tool to monitor events.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
