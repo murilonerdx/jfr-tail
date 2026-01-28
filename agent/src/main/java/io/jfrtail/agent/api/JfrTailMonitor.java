@@ -124,14 +124,23 @@ public class JfrTailMonitor {
 
     private void startRecording() {
         recordingStream = new RecordingStream();
+        // Tweaked configuration: keep thresholds low for interactivity
         recordingStream.enable("jdk.GarbageCollection").withThreshold(Duration.ofMillis(10));
         recordingStream.enable("jdk.JavaMonitorEnter").withThreshold(Duration.ofMillis(10));
         recordingStream.enable("jdk.ExceptionThrown");
+        recordingStream.enable("jdk.CPULoad").withPeriod(Duration.ofSeconds(1));
         recordingStream.setOrdered(false);
 
         recordingStream.onEvent(this::processEvent);
 
-        executor.submit(() -> recordingStream.start());
+        executor.submit(() -> {
+            try {
+                recordingStream.start();
+            } catch (Exception e) {
+                System.err.println("[JfrTail] RecordingStream FAILED: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
         System.out.println("[JfrTail] JFR Stream started");
     }
 
@@ -140,7 +149,14 @@ public class JfrTailMonitor {
         jfrEvent.setTs(event.getStartTime());
         jfrEvent.setPid(ProcessHandle.current().pid());
         jfrEvent.setEvent(event.getEventType().getName());
-        jfrEvent.setThread(event.getThread().getJavaName());
+
+        // FIX: Check for null thread (e.g. CPULoad events)
+        if (event.getThread() != null) {
+            jfrEvent.setThread(event.getThread().getJavaName());
+        } else {
+            jfrEvent.setThread("System");
+        }
+
         if (event.hasField("duration")) {
             jfrEvent.setDurationMs(event.getDuration("duration").toNanos() / 1_000_000.0);
         }
@@ -153,7 +169,7 @@ public class JfrTailMonitor {
             String json = JsonUtils.toJson(jfrEvent);
             for (PrintWriter writer : tcpClients) {
                 writer.println(json);
-                writer.flush();
+                writer.flush(); // Ensure immediate send
             }
         }
     }
