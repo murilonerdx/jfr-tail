@@ -1,9 +1,9 @@
-# 🦅# JFR-Tail (v1.1.0)
+# 🦅# JFR-Tail (v1.2.0)
 > **"Tail -f" for your JVM Flight Recorder events.**
 
 🇧🇷 [Leia em Português](README_PT.md)
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Version](https://img.shields.io/badge/version-1.1.0-purple)
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Version](https://img.shields.io/badge/version-1.2.0-purple)
 
 **JFR-Tail** brings visibility to your JVM in real-time without the heavy bloat of full APMs. It attaches to your running Java process, streams JFR events (GC, Locks, Exceptions), and presents them in a beautiful Terminal UI (TUI).
 
@@ -40,7 +40,7 @@ Add the repository and dependency to `pom.xml`.
 <dependency>
     <groupId>io.jfrtail</groupId>
     <artifactId>jfr-tail-spring-starter</artifactId>
-    <version>1.1.4</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 *Note: You must provide your GitHub Username and a PAT (Personal Access Token) with `read:packages` scope in your global `settings.xml` or environment variables for authentication.*
@@ -58,7 +58,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.jfrtail:jfr-tail-spring-starter:1.1.4")
+    implementation("io.jfrtail:jfr-tail-spring-starter:1.2.0")
 }
 ```
 
