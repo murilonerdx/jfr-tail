@@ -105,6 +105,7 @@ public class JfrTailMonitor {
             client.setSoTimeout(0); // Infinite
             writer.println("OK Welcome");
             tcpClients.add(writer);
+            System.out.println("[JfrTail] TCP Client authenticated and added. Current clients: " + tcpClients.size());
 
             // Wait for disconnect
             while (reader.readLine() != null) {
@@ -113,8 +114,10 @@ public class JfrTailMonitor {
         } catch (IOException e) {
             // Disconnect
         } finally {
-            if (writer != null)
+            if (writer != null) {
                 tcpClients.remove(writer);
+                System.out.println("[JfrTail] TCP Client disconnected. Remaining clients: " + tcpClients.size());
+            }
             try {
                 client.close();
             } catch (Exception e) {
@@ -126,6 +129,10 @@ public class JfrTailMonitor {
         recordingStream = new RecordingStream();
         // Lower thresholds to zero (capture all) for maximum visibility into contention
         recordingStream.enable("jdk.GarbageCollection");
+        recordingStream.enable("jdk.GCHeapSummary").withPeriod(Duration.ofSeconds(1));
+        recordingStream.enable("jdk.MetaspaceSummary").withPeriod(Duration.ofSeconds(5));
+        recordingStream.enable("jdk.ObjectAllocationOutsideTLAB").withThreshold(Duration.ZERO);
+
         recordingStream.enable("jdk.JavaMonitorEnter").withThreshold(Duration.ZERO);
         recordingStream.enable("jdk.JavaMonitorWait").withThreshold(Duration.ZERO);
         recordingStream.enable("jdk.ThreadPark").withThreshold(Duration.ZERO);
@@ -147,6 +154,7 @@ public class JfrTailMonitor {
     }
 
     private void processEvent(RecordedEvent event) {
+        System.out.println("[DEBUG] Captured JFR Event: " + event.getEventType().getName());
         JfrEvent jfrEvent = new JfrEvent();
         jfrEvent.setTs(event.getStartTime());
         jfrEvent.setPid(ProcessHandle.current().pid());
@@ -170,14 +178,7 @@ public class JfrTailMonitor {
                     || "stackTrace".equals(name)) {
                 continue;
             }
-            Object value = event.getValue(name);
-            if (value instanceof jdk.jfr.consumer.RecordedClass) {
-                fields.put(name, ((jdk.jfr.consumer.RecordedClass) value).getName());
-            } else if (value instanceof jdk.jfr.consumer.RecordedThread) {
-                fields.put(name, ((jdk.jfr.consumer.RecordedThread) value).getJavaName());
-            } else if (value != null) {
-                fields.put(name, value.toString());
-            }
+            fields.put(name, extractValue(event.getValue(name)));
         }
         jfrEvent.setFields(fields);
 
@@ -186,12 +187,36 @@ public class JfrTailMonitor {
 
         // Broadcast to TCP Clients
         if (!tcpClients.isEmpty()) {
-            String json = JsonUtils.toJson(jfrEvent);
-            for (PrintWriter writer : tcpClients) {
-                writer.println(json);
-                writer.flush();
+            try {
+                String json = JsonUtils.toJson(jfrEvent);
+                for (PrintWriter writer : tcpClients) {
+                    writer.println(json);
+                    writer.flush();
+                }
+                System.out.println("[DEBUG] Broadcasted to " + tcpClients.size() + " clients. JSON: "
+                        + json.substring(0, Math.min(json.length(), 50)) + "...");
+            } catch (Exception e) {
+                System.err.println("[JfrTail] ERROR broadcasting event: " + e.getMessage());
             }
         }
+    }
+
+    private Object extractValue(Object value) {
+        if (value == null)
+            return null;
+        if (value instanceof jdk.jfr.consumer.RecordedClass) {
+            return ((jdk.jfr.consumer.RecordedClass) value).getName();
+        } else if (value instanceof jdk.jfr.consumer.RecordedThread) {
+            return ((jdk.jfr.consumer.RecordedThread) value).getJavaName();
+        } else if (value instanceof jdk.jfr.consumer.RecordedObject) {
+            jdk.jfr.consumer.RecordedObject ro = (jdk.jfr.consumer.RecordedObject) value;
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            for (jdk.jfr.ValueDescriptor v : ro.getFields()) {
+                map.put(v.getName(), extractValue(ro.getValue(v.getName())));
+            }
+            return map;
+        }
+        return value.toString();
     }
 
     public void stop() {

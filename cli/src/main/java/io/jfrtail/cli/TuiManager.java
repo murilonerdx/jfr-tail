@@ -46,6 +46,7 @@ public class TuiManager {
     private long lockCount = 0;
     private long exceptionCount = 0;
     private long totalEvents = 0;
+    private final java.util.Map<String, Long> memoryStats = new java.util.concurrent.ConcurrentHashMap<>();
 
     // Chart history (last 20 seconds)
     private final LinkedList<Integer> eventsPerSecondHistory = new LinkedList<>();
@@ -133,6 +134,7 @@ public class TuiManager {
 
                     String line;
                     while (running && (line = in.readLine()) != null) {
+                        logDebug("RCV: " + line);
                         processEventLine(line);
                     }
                 } catch (Exception e) {
@@ -173,7 +175,7 @@ public class TuiManager {
                         else
                             healthStatus = "UNKNOWN";
 
-                        // 2. Metrics (Top Endpoints Simulation)
+                        // 2. Metrics (Top Endpoints)
                         String metrics = actuatorClient.metric("http.server.requests");
                         if (metrics != null && metrics.contains("measurements")) {
                             try {
@@ -182,7 +184,6 @@ public class TuiManager {
                                 com.fasterxml.jackson.databind.JsonNode measurements = root.get("measurements");
                                 double count = 0;
                                 double totalTime = 0;
-
                                 if (measurements != null && measurements.isArray()) {
                                     for (com.fasterxml.jackson.databind.JsonNode m : measurements) {
                                         String stat = m.get("statistic").asText();
@@ -197,11 +198,36 @@ public class TuiManager {
                             } catch (Exception e) {
                                 topEndPoints = "Parse Error: " + e.getMessage();
                             }
-                        } else {
-                            topEndPoints = "No http.server.requests data";
                         }
 
-                        Thread.sleep(5000);
+                        // 3. JFR Stats (New Native Endpoint)
+                        String jfrStats = actuatorClient.get("/jfrtail");
+                        if (jfrStats != null && jfrStats.contains("metrics")) {
+                            try {
+                                java.util.Map<String, Object> data = JsonUtils.fromJson(jfrStats, java.util.Map.class);
+                                java.util.Map stats = (java.util.Map) data.get("metrics");
+                                if (stats != null) {
+                                    if (stats.containsKey("heap_used_mb"))
+                                        memoryStats.put("heap_used_mb",
+                                                Long.parseLong(stats.get("heap_used_mb").toString()));
+                                    if (stats.containsKey("heap_committed_mb"))
+                                        memoryStats.put("heap_committed_mb",
+                                                Long.parseLong(stats.get("heap_committed_mb").toString()));
+                                    if (stats.containsKey("last_gc_pause_ms"))
+                                        memoryStats.put("last_gc_pause_ms",
+                                                Long.parseLong(stats.get("last_gc_pause_ms").toString()));
+                                    totalEvents = Long.parseLong(stats.getOrDefault("total_events", "0").toString());
+                                    gcCount = Long.parseLong(stats.getOrDefault("gc_count", "0").toString());
+                                    lockCount = Long.parseLong(stats.getOrDefault("lock_count", "0").toString());
+                                    exceptionCount = Long
+                                            .parseLong(stats.getOrDefault("exception_count", "0").toString());
+                                }
+                            } catch (Exception e) {
+                                logDebug("JFR Stats Parse Error: " + e.getMessage());
+                            }
+                        }
+
+                        Thread.sleep(2000);
                     } catch (Exception e) {
                         healthStatus = "ERR";
                     }
@@ -244,6 +270,7 @@ public class TuiManager {
             screen.doResizeIfNecessary();
 
             draw(screen);
+            logDebug("UI Loop Tick - events: " + events.size() + ", total: " + totalEvents);
             Thread.sleep(100);
         }
 
@@ -267,7 +294,7 @@ public class TuiManager {
                 events.remove(events.size() - 1);
             }
         } catch (Exception e) {
-            // Debug: Show parse error in UI to help user diagnosis
+            logDebug("JSON PARSE ERROR: " + e.getMessage() + " | LINE: " + line);
             JfrEvent err = new JfrEvent();
             err.setTs(java.time.Instant.now());
             err.setEvent("PARSE ERROR");
@@ -334,6 +361,9 @@ public class TuiManager {
         drawBox(tg, 0, 0, width, 3);
         tg.setForegroundColor(TextColor.ANSI.CYAN);
         tg.putString(2, 1, "JFR-TAIL " + (actuatorClient != null ? "[SPRING MODE]" : "[JVM MODE]"));
+
+        tg.setForegroundColor(TextColor.ANSI.GREEN);
+        tg.putString(width - 20, 1, "[CONNECTED]");
         tg.putString(width - 40, 1, "Web: http://" + host + ":8080 (Agent)");
         tg.putString(width - 50, 1, "Rec: " + (recordFilePath != null ? "ON" : "OFF"));
 
@@ -360,6 +390,8 @@ public class TuiManager {
         tg.putString(2, 2, " LIVE EVENTS ");
 
         int row = 4;
+        logDebug("Drawing Events: size=" + events.size() + ", width=" + width + ", height=" + height + ", split="
+                + splitCol);
         for (JfrEvent event : events) {
             if (row >= height - 2)
                 break;
@@ -403,13 +435,16 @@ public class TuiManager {
         tg.putString(splitCol + 2, 4, "STATISTICS");
 
         tg.setForegroundColor(TextColor.ANSI.WHITE);
-        tg.putString(splitCol + 2, 6, String.format("Total: %d", totalEvents));
-        tg.setForegroundColor(TextColor.ANSI.YELLOW);
-        tg.putString(splitCol + 2, 7, String.format("GC:    %d", gcCount));
-        tg.setForegroundColor(TextColor.ANSI.RED);
-        tg.putString(splitCol + 2, 8, String.format("Locks: %d", lockCount));
-        tg.setForegroundColor(TextColor.ANSI.MAGENTA);
         tg.putString(splitCol + 2, 9, String.format("Excep: %d", exceptionCount));
+
+        tg.setForegroundColor(TextColor.ANSI.CYAN);
+        tg.putString(splitCol + 2, 11, "MEMORY");
+        tg.setForegroundColor(TextColor.ANSI.WHITE);
+        tg.putString(splitCol + 2, 12, String.format("Used:  %4d MB", memoryStats.getOrDefault("heap_used_mb", 0L)));
+        tg.putString(splitCol + 2, 13,
+                String.format("Comm:  %4d MB", memoryStats.getOrDefault("heap_committed_mb", 0L)));
+        tg.putString(splitCol + 2, 14,
+                String.format("GC Ps: %4d ms", memoryStats.getOrDefault("last_gc_pause_ms", 0L)));
 
         // ASCII Chart (Simple Bar)
         tg.setForegroundColor(TextColor.ANSI.CYAN);
@@ -470,8 +505,12 @@ public class TuiManager {
     }
 
     private String truncate(String s, int max) {
+        if (s == null)
+            return "";
+        if (max < 4)
+            return s.length() > max ? (max > 0 ? s.substring(0, max) : "") : s;
         if (s.length() <= max)
             return s;
-        return s.substring(0, Math.max(0, max - 1)) + "~";
+        return s.substring(0, max - 3) + "...";
     }
 }

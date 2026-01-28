@@ -58,7 +58,7 @@ public class ActuatorClient {
         return get("/env");
     }
 
-    private String get(String path) {
+    public String get(String path) {
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + path))

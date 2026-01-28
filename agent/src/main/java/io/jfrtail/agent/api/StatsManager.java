@@ -13,6 +13,11 @@ public class StatsManager {
     private final AtomicLong exceptionCount = new AtomicLong(0);
     private final AtomicLong totalEvents = new AtomicLong(0);
 
+    // Memory and GC details
+    private final AtomicLong heapUsed = new AtomicLong(0);
+    private final AtomicLong heapCommitted = new AtomicLong(0);
+    private final AtomicLong lastGcPauseMs = new AtomicLong(0);
+
     // Last minute metrics
     private final Map<String, AtomicLong> eventCounts = new ConcurrentHashMap<>();
 
@@ -26,9 +31,30 @@ public class StatsManager {
         String type = event.getEvent();
         eventCounts.computeIfAbsent(type, k -> new AtomicLong(0)).incrementAndGet();
 
-        if (type.contains("GarbageCollection"))
+        if (type.contains("GarbageCollection")) {
             gcCount.incrementAndGet();
-        else if (type.contains("JavaMonitor") || type.contains("ThreadPark"))
+            if (event.getDurationMs() != null) {
+                lastGcPauseMs.set(event.getDurationMs().longValue());
+            }
+        } else if (type.contains("GCHeapSummary")) {
+            Map<String, Object> fields = event.getFields();
+            if (fields != null && fields.containsKey("heapUsed")) {
+                Object used = fields.get("heapUsed");
+                if (used instanceof Map) {
+                    Object val = ((Map) used).get("used");
+                    if (val != null)
+                        heapUsed.set(Long.parseLong(val.toString()));
+                }
+            }
+            if (fields != null && fields.containsKey("heapCommitted")) {
+                Object comm = fields.get("heapCommitted");
+                if (comm instanceof Map) {
+                    Object val = ((Map) comm).get("committed");
+                    if (val != null)
+                        heapCommitted.set(Long.parseLong(val.toString()));
+                }
+            }
+        } else if (type.contains("JavaMonitor") || type.contains("ThreadPark"))
             lockCount.incrementAndGet();
         else if (type.contains("ExceptionThrown"))
             exceptionCount.incrementAndGet();
@@ -41,7 +67,10 @@ public class StatsManager {
                         "total_events", totalEvents.get(),
                         "gc_count", gcCount.get(),
                         "lock_count", lockCount.get(),
-                        "exception_count", exceptionCount.get()),
-                "last_event", lastEvent != null ? lastEvent : "none");
+                        "exception_count", exceptionCount.get(),
+                        "heap_used_mb", heapUsed.get() / (1024 * 1024),
+                        "heap_committed_mb", heapCommitted.get() / (1024 * 1024),
+                        "last_gc_pause_ms", lastGcPauseMs.get()),
+                "last_event", lastEvent != null ? lastEvent : Map.of());
     }
 }
