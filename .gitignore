@@ -13,6 +13,10 @@ build/
 *.err
 *.txt
 build_error*.log
+debug-cli.log
+sample_run.log
+cli_run.log
+build_log_*.txt
 
 # Java
 *.class

@@ -124,9 +124,11 @@ public class JfrTailMonitor {
 
     private void startRecording() {
         recordingStream = new RecordingStream();
-        // Tweaked configuration: keep thresholds low for interactivity
-        recordingStream.enable("jdk.GarbageCollection").withThreshold(Duration.ofMillis(10));
-        recordingStream.enable("jdk.JavaMonitorEnter").withThreshold(Duration.ofMillis(10));
+        // Lower thresholds to zero (capture all) for maximum visibility into contention
+        recordingStream.enable("jdk.GarbageCollection");
+        recordingStream.enable("jdk.JavaMonitorEnter").withThreshold(Duration.ZERO);
+        recordingStream.enable("jdk.JavaMonitorWait").withThreshold(Duration.ZERO);
+        recordingStream.enable("jdk.ThreadPark").withThreshold(Duration.ZERO);
         recordingStream.enable("jdk.ExceptionThrown");
         recordingStream.enable("jdk.CPULoad").withPeriod(Duration.ofSeconds(1));
         recordingStream.setOrdered(false);
@@ -150,7 +152,6 @@ public class JfrTailMonitor {
         jfrEvent.setPid(ProcessHandle.current().pid());
         jfrEvent.setEvent(event.getEventType().getName());
 
-        // FIX: Check for null thread (e.g. CPULoad events)
         if (event.getThread() != null) {
             jfrEvent.setThread(event.getThread().getJavaName());
         } else {
@@ -161,6 +162,25 @@ public class JfrTailMonitor {
             jfrEvent.setDurationMs(event.getDuration("duration").toNanos() / 1_000_000.0);
         }
 
+        // Extract detailed fields for better visibility
+        java.util.Map<String, Object> fields = new java.util.HashMap<>();
+        for (jdk.jfr.ValueDescriptor descriptor : event.getEventType().getFields()) {
+            String name = descriptor.getName();
+            if ("startTime".equals(name) || "duration".equals(name) || "eventThread".equals(name)
+                    || "stackTrace".equals(name)) {
+                continue;
+            }
+            Object value = event.getValue(name);
+            if (value instanceof jdk.jfr.consumer.RecordedClass) {
+                fields.put(name, ((jdk.jfr.consumer.RecordedClass) value).getName());
+            } else if (value instanceof jdk.jfr.consumer.RecordedThread) {
+                fields.put(name, ((jdk.jfr.consumer.RecordedThread) value).getJavaName());
+            } else if (value != null) {
+                fields.put(name, value.toString());
+            }
+        }
+        jfrEvent.setFields(fields);
+
         // Update Stats
         statsManager.accept(jfrEvent);
 
@@ -169,7 +189,7 @@ public class JfrTailMonitor {
             String json = JsonUtils.toJson(jfrEvent);
             for (PrintWriter writer : tcpClients) {
                 writer.println(json);
-                writer.flush(); // Ensure immediate send
+                writer.flush();
             }
         }
     }

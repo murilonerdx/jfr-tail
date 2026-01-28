@@ -28,7 +28,7 @@ public class StatsManager {
 
         if (type.contains("GarbageCollection"))
             gcCount.incrementAndGet();
-        else if (type.contains("JavaMonitorEnter"))
+        else if (type.contains("JavaMonitor") || type.contains("ThreadPark"))
             lockCount.incrementAndGet();
         else if (type.contains("ExceptionThrown"))
             exceptionCount.incrementAndGet();

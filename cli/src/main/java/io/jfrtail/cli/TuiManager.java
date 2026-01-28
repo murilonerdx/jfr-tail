@@ -351,15 +351,26 @@ public class TuiManager {
 
             if (type.contains("GarbageCollection"))
                 tg.setForegroundColor(TextColor.ANSI.YELLOW);
-            else if (type.contains("JavaMonitorEnter"))
+            else if (type.contains("JavaMonitor") || type.contains("ThreadPark"))
                 tg.setForegroundColor(TextColor.ANSI.RED);
             else if (type.contains("ExceptionThrown"))
                 tg.setForegroundColor(TextColor.ANSI.MAGENTA);
+            else if (type.contains("CPULoad"))
+                tg.setForegroundColor(TextColor.ANSI.GREEN);
             else
                 tg.setForegroundColor(TextColor.ANSI.WHITE);
 
+            StringBuilder fieldStr = new StringBuilder();
+            if (event.getFields() != null) {
+                event.getFields().forEach((k, v) -> {
+                    if (fieldStr.length() > 0)
+                        fieldStr.append(", ");
+                    fieldStr.append(k).append("=").append(v);
+                });
+            }
+
             String line = String.format("%s | %-16s | %-6s | %s", time, compact(type, 16), dur,
-                    event.getFields() != null ? event.getFields() : "");
+                    fieldStr.toString());
             tg.putString(2, row++, truncate(line, splitCol - 4));
         }
 

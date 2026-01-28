@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.3.0"
+    id("org.springframework.boot") version "3.3.2"
 }
 
 group = "io.jfrtail"
