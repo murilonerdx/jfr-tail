@@ -61,7 +61,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.jfrtail:jfr-tail-spring-starter:1.0.1")
+    implementation("io.jfrtail:jfr-tail-spring-starter:1.2.0")
 }
 ```
 
@@ -79,7 +79,7 @@ dependencies {
     <dependency>
         <groupId>io.jfrtail</groupId>
         <artifactId>jfr-tail-spring-starter</artifactId>
-        <version>1.0.1</version>
+        <version>1.2.0</version>
     </dependency>
 </dependencies>
 ```
@@ -102,7 +102,7 @@ Se você não usa Spring Boot, ainda pode importar a biblioteca `agent`:
 <dependency>
     <groupId>io.jfrtail</groupId>
     <artifactId>agent</artifactId>
-    <version>1.0.1</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 E inicie manualmente: `JfrTailMonitor.getInstance().start(webPort, tcpPort);`

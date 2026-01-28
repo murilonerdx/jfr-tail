@@ -48,6 +48,16 @@ public class EmbeddedServer {
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            // CORS Headers
+            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, OPTIONS");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
             // Extract Token
             String auth = exchange.getRequestHeaders().getFirst("Authorization");
             if (auth == null || !auth.startsWith("Bearer ")) {

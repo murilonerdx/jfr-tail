@@ -3,7 +3,7 @@
 
 🇺🇸 [Read in English](README.md)
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Version](https://img.shields.io/badge/version-4.0-purple)
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Version](https://img.shields.io/badge/version-1.2.0-purple)
 
 **JFR-Tail** traz visibilidade para sua JVM em tempo real sem o peso de APMs completos. Ele se conecta ao seu processo Java em execução, transmite eventos JFR (GC, Locks, Exceptions) e os apresenta em uma bela Interface de Terminal (TUI).
 
@@ -12,20 +12,32 @@
 ## 🚀 Principais Recursos
 
 *   **TUI em Tempo Real**: Veja Garbage Collections, Thread Locks e Exceptions conforme acontecem.
+*   **Dados Brutos (Raw Data) 📊**: Monitoramento detalhado de GC, Heap (Used/Comm) e Pausas diretamente na CLI.
 *   **Segurança V4 🔒**: Autenticação Zero-Dependency usando HMAC-SHA256 JWTs.
 *   **Integração Spring Boot V3 🌱**: Correlacione eventos da JVM com Actuator Health & Metrics.
 *   **Pacotes de Incidente 📦**: Pressione 'B' para tirar um instantâneo imediato do estado do sistema para depuração.
-*   **Leve**: Mínimo overhead (< 1% CPU), zero dependências externas para o Agente.
+*   **CORS Enabled 🌐**: Acesse métricas de qualquer aplicação Frontend.
 
 ---
 
 ## 📦 Instalação
+O JFR-Tail é publicado no **GitHub Packages**. Você deve configurar a autenticação para baixar as dependências.
 
-1.  **Compile o projeto**:
-    ```bash
-    ./gradlew assemble
-    ```
-    *Saída:* `cli/build/libs/cli-1.0-SNAPSHOT.jar` e `agent/build/libs/agent-1.0-SNAPSHOT.jar`.
+### Maven
+Adicione o repositório e a dependência ao seu `pom.xml`.
+
+```xml
+<dependency>
+    <groupId>io.jfrtail</groupId>
+    <artifactId>jfr-tail-spring-starter</artifactId>
+    <version>1.2.0</version>
+</dependency>
+```
+
+### Gradle
+```kotlin
+implementation("io.jfrtail:jfr-tail-spring-starter:1.2.0")
+```
 
 ---
 
