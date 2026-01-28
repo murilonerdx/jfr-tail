@@ -228,6 +228,9 @@ public class TuiManager {
             if (fileWriter != null)
                 fileWriter.println(line);
 
+            if (line == null || line.trim().isEmpty())
+                return;
+
             JfrEvent event = JsonUtils.fromJson(line, JfrEvent.class);
             updateStats(event);
             events.add(0, event);
@@ -235,7 +238,14 @@ public class TuiManager {
                 events.remove(events.size() - 1);
             }
         } catch (Exception e) {
-            // Ignore parse errors
+            // Debug: Show parse error in UI to help user diagnosis
+            JfrEvent err = new JfrEvent();
+            err.setTs(java.time.Instant.now());
+            err.setEvent("PARSE ERROR");
+            // Show first 50 chars of line to see what's wrong
+            String snippet = line.length() > 50 ? line.substring(0, 50) + "..." : line;
+            err.setThread(snippet);
+            events.add(0, err);
         }
     }
 

@@ -153,6 +153,7 @@ public class JfrTailMonitor {
             String json = JsonUtils.toJson(jfrEvent);
             for (PrintWriter writer : tcpClients) {
                 writer.println(json);
+                writer.flush();
             }
         }
     }
