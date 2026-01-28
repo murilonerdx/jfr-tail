@@ -45,7 +45,71 @@ Se você deseja conceder acesso temporário a um desenvolvedor/SRE sem compartil
 
 ---
 
-## Integração Spring Boot (V3)
+## Integração Spring Boot (Recomendado)
+Adicione a dependência ao seu `pom.xml` ou `build.gradle` para habilitar a auto-configuração:
+
+#### Gradle
+```kotlin
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/murilonerdx/jfr-tail")
+        credentials {
+            username = "SEU_USUARIO_GITHUB"
+            password = "SEU_TOKEN_GITHUB"
+        }
+    }
+}
+
+dependencies {
+    implementation("io.jfrtail:jfr-tail-spring-starter:1.0.1")
+}
+```
+
+#### Maven
+```xml
+<repositories>
+    <repository>
+        <id>github</id>
+        <url>https://maven.pkg.github.com/murilonerdx/jfr-tail</url>
+        <snapshots><enabled>true</enabled></snapshots>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>io.jfrtail</groupId>
+        <artifactId>jfr-tail-spring-starter</artifactId>
+        <version>1.0.1</version>
+    </dependency>
+</dependencies>
+```
+
+#### Configuração (`application.yml`)
+O starter inicializa automaticamente o monitor JFR-Tail. Você pode personalizá-lo:
+
+```yaml
+jfr-tail:
+  enabled: true       # Padrão true
+  web-port: 8081      # Padrão 8080 (Mude se o Boot usar 8080)
+  tcp-port: 7099      # Padrão 7099
+  secret: "seu-segredo-compartilhado"
+```
+
+### Setup Manual (Sem Spring)
+Se você não usa Spring Boot, ainda pode importar a biblioteca `agent`:
+
+```xml
+<dependency>
+    <groupId>io.jfrtail</groupId>
+    <artifactId>agent</artifactId>
+    <version>1.0.1</version>
+</dependency>
+```
+E inicie manualmente: `JfrTailMonitor.getInstance().start(webPort, tcpPort);`
+
+---
+
+## Integração Spring Boot Actuator (Opcional)
 O JFR-Tail pode se integrar com o Spring Boot Actuator para mostrar Status de Saúde e Métricas HTTP ao lado de eventos da JVM.
 
 ### Configuração
