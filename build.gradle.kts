@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.jfrtail"
-version = "1.0.3"
+version = "1.0.4"
 
 allprojects {
     repositories {
