@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+Premain-Class: io.jfrtail.agent.JfrTailAgent
+Agent-Class: io.jfrtail.agent.JfrTailAgent
+Can-Redefine-Classes: true
+Can-Retransform-Classes: true
+
