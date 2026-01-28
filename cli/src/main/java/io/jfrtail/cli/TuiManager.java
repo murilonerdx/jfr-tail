@@ -101,36 +101,59 @@ public class TuiManager {
 
         // Background thread to read from socket
         Thread networkThread = new Thread(() -> {
-            try (Socket socket = new Socket(host, port);
-                    PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                    BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+            while (running) {
+                try (Socket socket = new Socket(host, port);
+                        PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                        BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
 
-                initDebugLog();
-                logDebug("CLI Network Thread Started. Connected to " + host + ":" + port);
+                    initDebugLog();
+                    logDebug("CLI Network Thread Connected to " + host + ":" + port);
 
-                // AUTH HANDSHAKE
-                if (token != null) {
-                    out.println("AUTH " + token);
-                    String response = in.readLine();
-                    logDebug("Auth Response: " + response);
-                    if (response != null && !response.startsWith("OK")) {
-                        // Auth Failed
-                        JfrEvent err = new JfrEvent();
-                        err.setTs(java.time.Instant.now());
-                        err.setEvent("AUTH FAILED");
-                        err.setThread(response);
-                        events.add(0, err);
+                    // Synthesize a local event to notify user of connection
+                    JfrEvent connEvent = new JfrEvent();
+                    connEvent.setTs(java.time.Instant.now());
+                    connEvent.setEvent("CLI_CONNECTED");
+                    connEvent.setThread("Connected to " + host + ":" + port);
+                    events.add(0, connEvent);
+
+                    // AUTH HANDSHAKE
+                    if (token != null) {
+                        out.println("AUTH " + token);
+                        String response = in.readLine();
+                        logDebug("Auth Response: " + response);
+                        if (response != null && !response.startsWith("OK")) {
+                            // Auth Failed
+                            JfrEvent err = new JfrEvent();
+                            err.setTs(java.time.Instant.now());
+                            err.setEvent("AUTH FAILED");
+                            err.setThread(response);
+                            events.add(0, err);
+                        }
+                    }
+
+                    String line;
+                    while (running && (line = in.readLine()) != null) {
+                        processEventLine(line);
+                    }
+                } catch (Exception e) {
+                    logDebug("Network Error (Will retry): " + e.getMessage());
+                    // Notify user via event stream
+                    JfrEvent disconn = new JfrEvent();
+                    disconn.setTs(java.time.Instant.now());
+                    disconn.setEvent("CLI_DISCONNECTED");
+                    disconn.setThread("Connection lost: " + e.getMessage() + ". Retrying in 5s...");
+                    events.add(0, disconn);
+                }
+
+                // Wait before reconnecting
+                if (running) {
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
                     }
                 }
-
-                String line;
-                while (running && (line = in.readLine()) != null) {
-                    // logDebug("RCV: " + line); // Verbose
-                    processEventLine(line);
-                }
-            } catch (Exception e) {
-                logDebug("Network Error: " + e.getMessage());
-                e.printStackTrace();
             }
         });
         networkThread.setDaemon(true);

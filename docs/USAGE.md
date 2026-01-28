@@ -146,3 +146,29 @@ You must generate a valid token (`jfr-tail token ...`) and pass it in the URL qu
 
 **"Address already in use"**:
 - The agent port (7099) or web port (8080) is occupied. Use different ports via command line arguments if possible (Agent support required) or kill the conflicting process.
+
+---
+
+## Production Readiness
+
+### 1. Configuration Management (Secrets)
+For production environments, avoid passing secrets via command line args. JFR-Tail honors the standard Spring Boot configuration hierarchy. You can set the secret via:
+
+**Environment Variables:**
+```bash
+export JFR_TAIL_SECRET="production-secure-secret-v1"
+java -jar my-app.jar
+```
+
+**Spring Cloud Consul / Config Server:**
+If your application uses Spring Cloud, simply add the property to your shared configuration:
+```yaml
+jfr-tail:
+  secret: "production-secure-secret-v1"
+  enabled: true
+```
+
+### 2. Reliable Connectivity
+The CLI Tool (`jfr-tail-cli.jar`) is designed for long-running monitoring sessions.
+- **Auto-Reconnect**: If the application restarts or the network drops, the CLI will automatically attempt to reconnect every 5 seconds.
+- **Persistent View**: You can keep the CLI running on a dedicated admin console without needing to restart it manually.
