@@ -146,10 +146,31 @@ public class TuiManager {
 
                         // 2. Metrics (Top Endpoints Simulation)
                         String metrics = actuatorClient.metric("http.server.requests");
-                        if (metrics.length() > 50)
-                            topEndPoints = "Data received (JSON parsing TODO)";
-                        else
+                        if (metrics != null && metrics.contains("measurements")) {
+                            try {
+                                com.fasterxml.jackson.databind.JsonNode root = JsonUtils.fromJson(metrics,
+                                        com.fasterxml.jackson.databind.JsonNode.class);
+                                com.fasterxml.jackson.databind.JsonNode measurements = root.get("measurements");
+                                double count = 0;
+                                double totalTime = 0;
+
+                                if (measurements != null && measurements.isArray()) {
+                                    for (com.fasterxml.jackson.databind.JsonNode m : measurements) {
+                                        String stat = m.get("statistic").asText();
+                                        double val = m.get("value").asDouble();
+                                        if ("COUNT".equals(stat))
+                                            count = val;
+                                        if ("TOTAL_TIME".equals(stat))
+                                            totalTime = val;
+                                    }
+                                }
+                                topEndPoints = String.format("Requests: %.0f | Total Time: %.2fs", count, totalTime);
+                            } catch (Exception e) {
+                                topEndPoints = "Parse Error: " + e.getMessage();
+                            }
+                        } else {
                             topEndPoints = "No http.server.requests data";
+                        }
 
                         Thread.sleep(5000);
                     } catch (Exception e) {
