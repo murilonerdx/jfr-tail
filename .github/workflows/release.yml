@@ -32,11 +32,14 @@ jobs:
       - name: Build Agent and CLI
         run: ./gradlew :agent:assemble :cli:assemble -x test
 
+      - name: List Artifacts (Debug)
+        run: ls -R agent/build/libs cli/build/libs
+
       - name: Prepare Artifacts
         run: |
           mkdir out
-          cp agent/build/libs/agent-*.jar out/jfr-tail-agent.jar
-          cp cli/build/libs/cli-*.jar out/jfr-tail-cli.jar
+          cp agent/build/libs/agent*.jar out/jfr-tail-agent.jar
+          cp cli/build/libs/cli*.jar out/jfr-tail-cli.jar
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
