@@ -1,4 +1,4 @@
-# 🦅 JFR-Tail: The Complete Guide (v1.2.0)
+# 🦅 JFR-Tail: The Complete Guide (v1.3.0)
 
 Welcome to the comprehensive guide for **JFR-Tail**. This document covers everything from initial setup to advanced production deployment and frontend integration.
 
@@ -12,6 +12,7 @@ Welcome to the comprehensive guide for **JFR-Tail**. This document covers everyt
 5. [Production Deployment with Consul](#-production-deployment-with-consul)
 6. [Frontend Integration & CORS](#-frontend-integration--cors)
 7. [Advanced Usage: Incident Bundles](#-advanced-usage-incident-bundles)
+8. [Professional Observability (v1.3.0)](#-professional-observability-v130)
 
 ---
 
@@ -53,7 +54,7 @@ Add the repository and the starter dependency to your `pom.xml`.
     <dependency>
         <groupId>io.jfrtail</groupId>
         <artifactId>jfr-tail-spring-starter</artifactId>
-        <version>1.2.0</version>
+            <version>1.3.0</version>
     </dependency>
 </dependencies>
 ```
@@ -131,8 +132,9 @@ The Agent exposes data via:
 - `GET /jfr/dashboard`: Returns a simple HTML preview.
 - `GET /actuator/jfrtail`: (In Spring Mode) Standard Actuator integration.
 
-### CORS Setup
-CORS is **enabled by default** in v1.2.0 for all origins (`*`). This allows your React/Vue/Angular dashboards to fetch JFR data directly from the Agent's web port.
+### CORS & Endpoints Setup
+CORS is **enabled by default** in v1.2.0 for all origins (`*`).
+As of v1.2.1, you can disable specific endpoints via properties.
 
 **Example Fetch:**
 ```javascript
@@ -158,3 +160,25 @@ When a performance spike occurs, press **`B`** in the CLI. JFR-Tail will:
 ---
 
 🦅 **JFR-Tail** - Granular JVM visibility, tail-style.
+
+---
+
+## 🚀 Professional Observability (v1.3.0)
+
+Version **1.3.0** introduces enterprise-grade observability features:
+
+### 1. CLI Power Features
+- **Dynamic Filtering**: Press **`F`** and type to filter events in real-time (by name or thread).
+- **JSON Drill-down**: Use arrows to select an event and press **`ENTER`** to see the full raw JFR data in a modal.
+- **Smart Alerts**: Visual warnings appear automatically for GC stalls (>500ms) or exception spikes.
+
+### 2. Native Prometheus Integration
+The Agent now exposes Prometheus-formatted metrics at:
+`GET /jfr/metrics` (No authentication required by default).
+
+### 3. Event History API
+Consult the last 50 captured events at any time via:
+`GET /jfr/history` (Requires JWT Bearer Token).
+
+### 4. History Buffer
+The Agent keeps a thread-safe circular buffer of recent events, enabling "Back-in-time" analysis even for short-lived spikes.

@@ -32,6 +32,8 @@ public class EmbeddedServer {
         server = HttpServer.create(new InetSocketAddress(port), 0);
         if (statsEnabled) {
             server.createContext("/jfr/stats", new AuthMiddleware(new StatsHandler()));
+            server.createContext("/jfr/metrics", new MetricsHandler()); // Public Prometheus metrics
+            server.createContext("/jfr/history", new AuthMiddleware(new HistoryHandler()));
         }
         if (dashboardEnabled) {
             server.createContext("/jfr/dashboard", new AuthMiddleware(new DashboardHandler()));
@@ -106,6 +108,41 @@ public class EmbeddedServer {
             }
 
             String jsonResponse = JsonUtils.toJson(statsManager.getSnapshot());
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            byte[] responseBytes = jsonResponse.getBytes();
+            exchange.sendResponseHeaders(200, responseBytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(responseBytes);
+            }
+        }
+    }
+
+    private class MetricsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            StringBuilder sb = new StringBuilder();
+            java.util.Map<String, Object> snapshot = statsManager.getSnapshot();
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> metrics = (java.util.Map<String, Object>) snapshot.get("metrics");
+
+            if (metrics != null) {
+                metrics.forEach((k, v) -> {
+                    sb.append("jfr_tail_").append(k).append(" ").append(v).append("\n");
+                });
+            }
+
+            byte[] responseBytes = sb.toString().getBytes();
+            exchange.sendResponseHeaders(200, responseBytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(responseBytes);
+            }
+        }
+    }
+
+    private class HistoryHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String jsonResponse = JsonUtils.toJson(statsManager.getHistory());
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             byte[] responseBytes = jsonResponse.getBytes();
             exchange.sendResponseHeaders(200, responseBytes.length);

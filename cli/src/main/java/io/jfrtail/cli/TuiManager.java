@@ -27,7 +27,6 @@ public class TuiManager {
     private final String host;
     private final int port;
     private final String recordFilePath;
-    private final String actuatorUrl;
     private final String token;
 
     private final io.jfrtail.cli.spring.ActuatorClient actuatorClient;
@@ -41,12 +40,19 @@ public class TuiManager {
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
     private volatile boolean running = true;
 
-    private String eventFilter = "";
+    // New UI State for v1.3.0
+    private int selectedEventIndex = 0;
+    private boolean showJsonModal = false;
+    private boolean filteringMode = false;
+    private final StringBuilder filterInput = new StringBuilder();
+
     private long gcCount = 0;
     private long lockCount = 0;
     private long exceptionCount = 0;
     private long totalEvents = 0;
     private final java.util.Map<String, Long> memoryStats = new java.util.concurrent.ConcurrentHashMap<>();
+    private String lastAlert = "";
+    private long lastAlertTime = 0;
 
     // Chart history (last 20 seconds)
     private final LinkedList<Integer> eventsPerSecondHistory = new LinkedList<>();
@@ -60,7 +66,6 @@ public class TuiManager {
         this.host = host;
         this.port = port;
         this.recordFilePath = recordFilePath;
-        this.actuatorUrl = actuatorUrl;
         this.token = token;
 
         if (actuatorUrl != null) {
@@ -204,8 +209,11 @@ public class TuiManager {
                         String jfrStats = actuatorClient.get("/jfrtail");
                         if (jfrStats != null && jfrStats.contains("metrics")) {
                             try {
+                                @SuppressWarnings("unchecked")
                                 java.util.Map<String, Object> data = JsonUtils.fromJson(jfrStats, java.util.Map.class);
-                                java.util.Map stats = (java.util.Map) data.get("metrics");
+                                @SuppressWarnings("unchecked")
+                                java.util.Map<String, Object> stats = (java.util.Map<String, Object>) data
+                                        .get("metrics");
                                 if (stats != null) {
                                     if (stats.containsKey("heap_used_mb"))
                                         memoryStats.put("heap_used_mb",
@@ -250,18 +258,45 @@ public class TuiManager {
 
             KeyStroke keyStroke = screen.pollInput();
             if (keyStroke != null) {
-                if (keyStroke.getKeyType() == KeyType.Escape
-                        || (keyStroke.getCharacter() != null && keyStroke.getCharacter() == 'q')) {
-                    running = false;
-                    break;
-                } else if (keyStroke.getCharacter() != null) {
-                    char c = keyStroke.getCharacter();
-                    if (c == 'c') {
-                        clearData();
-                    } else if (c == 's') {
-                        showSpringPanel = !showSpringPanel;
-                    } else if (c == 'b') {
-                        createIncidentBundle();
+                if (filteringMode) {
+                    if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.Escape) {
+                        filteringMode = false;
+                    } else if (keyStroke.getKeyType() == KeyType.Backspace && filterInput.length() > 0) {
+                        filterInput.setLength(filterInput.length() - 1);
+                        selectedEventIndex = 0;
+                    } else if (keyStroke.getCharacter() != null) {
+                        filterInput.append(keyStroke.getCharacter());
+                        selectedEventIndex = 0;
+                    }
+                } else if (showJsonModal) {
+                    if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.Enter) {
+                        showJsonModal = false;
+                    }
+                } else {
+                    if (keyStroke.getKeyType() == KeyType.Escape) {
+                        running = false;
+                        break;
+                    } else if (keyStroke.getKeyType() == KeyType.ArrowUp) {
+                        if (selectedEventIndex > 0)
+                            selectedEventIndex--;
+                    } else if (keyStroke.getKeyType() == KeyType.ArrowDown) {
+                        selectedEventIndex++;
+                    } else if (keyStroke.getKeyType() == KeyType.Enter) {
+                        showJsonModal = true;
+                    } else if (keyStroke.getCharacter() != null) {
+                        char c = keyStroke.getCharacter();
+                        if (c == 'q') {
+                            running = false;
+                            break;
+                        } else if (c == 'c') {
+                            clearData();
+                        } else if (c == 's') {
+                            showSpringPanel = !showSpringPanel;
+                        } else if (c == 'b') {
+                            createIncidentBundle();
+                        } else if (c == 'f') {
+                            filteringMode = true;
+                        }
                     }
                 }
             }
@@ -345,9 +380,21 @@ public class TuiManager {
                 gcCount++;
             else if (event.getEvent().contains("JavaMonitorEnter"))
                 lockCount++;
-            else if (event.getEvent().contains("ExceptionThrown"))
+            else if (event.getEvent().contains("ExceptionThrown")) {
                 exceptionCount++;
+                triggerAlert("EXCEPTION SPIKE DETECTED!");
+            }
         }
+
+        // Threshold check for GC
+        if (event.getDurationMs() != null && event.getDurationMs() > 500) {
+            triggerAlert("STALL DETECTED: GC PAUSE " + event.getDurationMs() + "ms");
+        }
+    }
+
+    private void triggerAlert(String msg) {
+        this.lastAlert = msg;
+        this.lastAlertTime = System.currentTimeMillis();
     }
 
     private void draw(Screen screen) throws IOException {
@@ -367,6 +414,13 @@ public class TuiManager {
         tg.putString(width - 40, 1, "Web: http://" + host + ":8080 (Agent)");
         tg.putString(width - 50, 1, "Rec: " + (recordFilePath != null ? "ON" : "OFF"));
 
+        if (System.currentTimeMillis() - lastAlertTime < 5000) {
+            tg.setForegroundColor(TextColor.ANSI.RED);
+            tg.setBackgroundColor(TextColor.ANSI.YELLOW);
+            tg.putString(width / 2 - 10, 1, " ALERT: " + lastAlert + " ");
+            tg.setBackgroundColor(TextColor.ANSI.BLACK);
+        }
+
         if (showSpringPanel && actuatorClient != null) {
             drawSpringPanel(tg, width, height);
         } else {
@@ -376,8 +430,15 @@ public class TuiManager {
         // Footer
         tg.setBackgroundColor(TextColor.ANSI.WHITE);
         tg.setForegroundColor(TextColor.ANSI.BLACK);
-        String footer = " Q: Quit | C: Clear | S: Spring Panel | B: Bundle Zip ";
+        String footer = " Q:Quit | C:Clear | S:Spring | B:Bundle | F:Filter | Enter:Detail ";
+        if (filteringMode) {
+            footer = " TYPE TO FILTER... [ENTER/ESC to finish] | Buffer: " + filterInput.toString();
+        }
         tg.putString(0, height - 1, String.format("%-" + width + "s", footer));
+
+        if (showJsonModal) {
+            drawJsonModal(tg, width, height);
+        }
 
         screen.refresh();
     }
@@ -390,13 +451,27 @@ public class TuiManager {
         tg.putString(2, 2, " LIVE EVENTS ");
 
         int row = 4;
-        logDebug("Drawing Events: size=" + events.size() + ", width=" + width + ", height=" + height + ", split="
-                + splitCol);
-        for (JfrEvent event : events) {
+
+        // Filter logic
+        List<JfrEvent> filtered = events.stream()
+                .filter(e -> {
+                    if (filterInput.length() == 0)
+                        return true;
+                    String f = filterInput.toString().toLowerCase();
+                    String type = e.getEvent() != null ? e.getEvent().toLowerCase() : "";
+                    String thread = e.getThread() != null ? e.getThread().toLowerCase() : "";
+                    return type.contains(f) || thread.contains(f);
+                })
+                .collect(java.util.stream.Collectors.toList());
+
+        if (selectedEventIndex >= filtered.size() && filtered.size() > 0) {
+            selectedEventIndex = filtered.size() - 1;
+        }
+
+        for (int i = 0; i < filtered.size(); i++) {
             if (row >= height - 2)
                 break;
-            if (event.getEvent() != null && !event.getEvent().toLowerCase().contains(eventFilter.toLowerCase()))
-                continue;
+            JfrEvent event = filtered.get(i);
 
             String time = event.getTs() != null
                     ? timeFormatter.format(event.getTs().atZone(java.time.ZoneId.systemDefault()))
@@ -404,16 +479,22 @@ public class TuiManager {
             String type = event.getEvent() != null ? event.getEvent().replace("jdk.", "") : "Unknown";
             String dur = event.getDurationMs() != null ? String.format("%.1fms", event.getDurationMs()) : "";
 
-            if (type.contains("GarbageCollection"))
-                tg.setForegroundColor(TextColor.ANSI.YELLOW);
-            else if (type.contains("JavaMonitor") || type.contains("ThreadPark"))
-                tg.setForegroundColor(TextColor.ANSI.RED);
-            else if (type.contains("ExceptionThrown"))
-                tg.setForegroundColor(TextColor.ANSI.MAGENTA);
-            else if (type.contains("CPULoad"))
-                tg.setForegroundColor(TextColor.ANSI.GREEN);
-            else
-                tg.setForegroundColor(TextColor.ANSI.WHITE);
+            if (i == selectedEventIndex && !filteringMode && !showJsonModal) {
+                tg.setBackgroundColor(TextColor.ANSI.WHITE);
+                tg.setForegroundColor(TextColor.ANSI.BLACK);
+            } else {
+                tg.setBackgroundColor(TextColor.ANSI.BLACK);
+                if (type.contains("GarbageCollection"))
+                    tg.setForegroundColor(TextColor.ANSI.YELLOW);
+                else if (type.contains("JavaMonitor") || type.contains("ThreadPark"))
+                    tg.setForegroundColor(TextColor.ANSI.RED);
+                else if (type.contains("ExceptionThrown"))
+                    tg.setForegroundColor(TextColor.ANSI.MAGENTA);
+                else if (type.contains("CPULoad"))
+                    tg.setForegroundColor(TextColor.ANSI.GREEN);
+                else
+                    tg.setForegroundColor(TextColor.ANSI.WHITE);
+            }
 
             StringBuilder fieldStr = new StringBuilder();
             if (event.getFields() != null) {
@@ -427,6 +508,7 @@ public class TuiManager {
             String line = String.format("%s | %-16s | %-6s | %s", time, compact(type, 16), dur,
                     fieldStr.toString());
             tg.putString(2, row++, truncate(line, splitCol - 4));
+            tg.setBackgroundColor(TextColor.ANSI.BLACK); // Reset for next line
         }
 
         // --- STATS PANEL (Right) ---
@@ -435,7 +517,9 @@ public class TuiManager {
         tg.putString(splitCol + 2, 4, "STATISTICS");
 
         tg.setForegroundColor(TextColor.ANSI.WHITE);
-        tg.putString(splitCol + 2, 9, String.format("Excep: %d", exceptionCount));
+        tg.putString(splitCol + 2, 8, String.format("GC Evt: %d", gcCount));
+        tg.putString(splitCol + 2, 9, String.format("Excep:  %d", exceptionCount));
+        tg.putString(splitCol + 2, 10, String.format("Locks:  %d", lockCount));
 
         tg.setForegroundColor(TextColor.ANSI.CYAN);
         tg.putString(splitCol + 2, 11, "MEMORY");
@@ -471,6 +555,53 @@ public class TuiManager {
         tg.putString(2, 10, "Correlated JFR Metrics:");
         tg.putString(2, 11, "GC Events in last minute: " + gcCount);
         tg.putString(2, 12, "Exceptions in last minute: " + exceptionCount);
+    }
+
+    private void drawJsonModal(TextGraphics tg, int width, int height) {
+        int modalW = (int) (width * 0.8);
+        int modalH = (int) (height * 0.7);
+        int x = (width - modalW) / 2;
+        int y = (height - modalH) / 2;
+
+        tg.setBackgroundColor(TextColor.ANSI.BLACK);
+        tg.setForegroundColor(TextColor.ANSI.WHITE);
+        for (int i = 0; i < modalH; i++) {
+            tg.putString(x, y + i, String.format("%" + modalW + "s", " "));
+        }
+        drawBox(tg, x, y, modalW, modalH);
+        tg.setForegroundColor(TextColor.ANSI.CYAN);
+        tg.putString(x + 2, y, " EVENT DETAILS (JSON) ");
+
+        // Get selected event
+        List<JfrEvent> filtered = events.stream()
+                .filter(e -> {
+                    if (filterInput.length() == 0)
+                        return true;
+                    String f = filterInput.toString().toLowerCase();
+                    String type = e.getEvent() != null ? e.getEvent().toLowerCase() : "";
+                    String thread = e.getThread() != null ? e.getThread().toLowerCase() : "";
+                    return type.contains(f) || thread.contains(f);
+                })
+                .collect(java.util.stream.Collectors.toList());
+
+        if (selectedEventIndex >= 0 && selectedEventIndex < filtered.size()) {
+            JfrEvent selected = filtered.get(selectedEventIndex);
+            try {
+                String json = JsonUtils.toJson(selected);
+                String[] lines = json.split("\n");
+                tg.setForegroundColor(TextColor.ANSI.WHITE);
+                for (int i = 0; i < lines.length && i < modalH - 4; i++) {
+                    tg.putString(x + 2, y + 2 + i, truncate(lines[i], modalW - 4));
+                }
+            } catch (Exception e) {
+                tg.putString(x + 2, y + 2, "Error rendering JSON: " + e.getMessage());
+            }
+        } else {
+            tg.putString(x + 2, y + 2, "No event selected.");
+        }
+
+        tg.setForegroundColor(TextColor.ANSI.YELLOW);
+        tg.putString(x + 2, y + modalH - 1, " [ESC/ENTER to close] ");
     }
 
     private void createIncidentBundle() {

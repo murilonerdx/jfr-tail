@@ -3,6 +3,9 @@ package io.jfrtail.agent.api;
 import io.jfrtail.common.JfrEvent;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,12 +24,17 @@ public class StatsManager {
     // Last minute metrics
     private final Map<String, AtomicLong> eventCounts = new ConcurrentHashMap<>();
 
+    // History Buffer (Circular)
+    private static final int MAX_HISTORY = 50;
+    private final List<JfrEvent> history = Collections.synchronizedList(new ArrayList<>());
+
     // Latest event for display
     private volatile JfrEvent lastEvent;
 
     public void accept(JfrEvent event) {
         totalEvents.incrementAndGet();
         lastEvent = event;
+        addToHistory(event);
 
         String type = event.getEvent();
         eventCounts.computeIfAbsent(type, k -> new AtomicLong(0)).incrementAndGet();
@@ -41,7 +49,8 @@ public class StatsManager {
             if (fields != null && fields.containsKey("heapUsed")) {
                 Object used = fields.get("heapUsed");
                 if (used instanceof Map) {
-                    Object val = ((Map) used).get("used");
+                    @SuppressWarnings("unchecked")
+                    Object val = ((Map<String, Object>) used).get("used");
                     if (val != null)
                         heapUsed.set(Long.parseLong(val.toString()));
                 }
@@ -49,7 +58,8 @@ public class StatsManager {
             if (fields != null && fields.containsKey("heapCommitted")) {
                 Object comm = fields.get("heapCommitted");
                 if (comm instanceof Map) {
-                    Object val = ((Map) comm).get("committed");
+                    @SuppressWarnings("unchecked")
+                    Object val = ((Map<String, Object>) comm).get("committed");
                     if (val != null)
                         heapCommitted.set(Long.parseLong(val.toString()));
                 }
@@ -58,6 +68,21 @@ public class StatsManager {
             lockCount.incrementAndGet();
         else if (type.contains("ExceptionThrown"))
             exceptionCount.incrementAndGet();
+    }
+
+    private void addToHistory(JfrEvent event) {
+        synchronized (history) {
+            if (history.size() >= MAX_HISTORY) {
+                history.remove(0);
+            }
+            history.add(event);
+        }
+    }
+
+    public List<JfrEvent> getHistory() {
+        synchronized (history) {
+            return new ArrayList<>(history);
+        }
     }
 
     public Map<String, Object> getSnapshot() {
@@ -71,6 +96,7 @@ public class StatsManager {
                         "heap_used_mb", heapUsed.get() / (1024 * 1024),
                         "heap_committed_mb", heapCommitted.get() / (1024 * 1024),
                         "last_gc_pause_ms", lastGcPauseMs.get()),
-                "last_event", lastEvent != null ? lastEvent : Map.of());
+                "last_event", lastEvent != null ? lastEvent : Map.of(),
+                "history", getHistory());
     }
 }
