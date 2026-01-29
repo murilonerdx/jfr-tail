@@ -1,9 +1,9 @@
-# 🦅# JFR-Tail (v1.2.0)
+# 🦅 JFR-Tail (v1.3.0)
 > **"Tail -f" for your JVM Flight Recorder events.**
 
 🇧🇷 [Leia em Português](README_PT.md)
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Version](https://img.shields.io/badge/version-1.2.0-purple)
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Version](https://img.shields.io/badge/version-1.3.0-purple)
 
 **JFR-Tail** brings visibility to your JVM in real-time without the heavy bloat of full APMs. It attaches to your running Java process, streams JFR events (GC, Locks, Exceptions), and presents them in a beautiful Terminal UI (TUI).
 
@@ -12,10 +12,12 @@
 ## 🚀 Key Features
 
 *   **Real-Time TUI**: View Garbage Collections, Thread Locks, and Exceptions as they happen.
-*   **V4 Security 🔒**: Zero-Dependency Authentication using HMAC-SHA256 JWTs.
-*   **Spring Boot V3 Integration 🌱**: Correlate JVM events with Actuator Health & Metrics.
-*   **Incident Bundles 📦**: Press 'B' to instantly snapshot the system state for debugging.
-*   **Lightweight**: Minimal overhead (< 1% CPU), zero external dependencies for the Agent.
+*   **Power Filtering �**: Press `F` to filter events by regex.
+*   **Drill-Down 🔬**: Select events and press `ENTER` to see full JSON details.
+*   **Observability �**: Native Prometheus metrics (`/jfr/metrics`) and History API (`/jfr/history`).
+*   **Smart Alerts 🚨**: Automatic detection of GC Stalls (>500ms) and Exception spikes.
+*   **Secure & Lightweight 🔒**: Zero-dependency Agent using HMAC-SHA256 JWTs.
+*   **Spring Boot V3 Integration 🌱**: Correlate JVM events with Actuator.
 
 ---
 
@@ -40,7 +42,7 @@ Add the repository and dependency to `pom.xml`.
 <dependency>
     <groupId>io.jfrtail</groupId>
     <artifactId>jfr-tail-spring-starter</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 *Note: You must provide your GitHub Username and a PAT (Personal Access Token) with `read:packages` scope in your global `settings.xml` or environment variables for authentication.*
@@ -58,7 +60,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.jfrtail:jfr-tail-spring-starter:1.2.0")
+    implementation("io.jfrtail:jfr-tail-spring-starter:1.3.0")
 }
 ```
 
