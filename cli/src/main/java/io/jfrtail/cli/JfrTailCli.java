@@ -118,6 +118,37 @@ public class JfrTailCli implements Callable<Integer> {
         }
     }
 
+    @Command(name = "bundle", description = "Download an incident bundle from a running agent")
+    public Integer bundle(
+            @Option(names = { "--host" }, defaultValue = "localhost", description = "Agent host") String host,
+            @Option(names = { "--port" }, defaultValue = "8080", description = "Agent Web port") int port,
+            @Option(names = { "-s", "--secret" }, description = "Shared Secret (Owner)") String secret,
+            @Option(names = { "-t", "--token" }, description = "Existing JWT Token (Guest)") String token,
+            @Option(names = { "-o",
+                    "--output" }, defaultValue = "jfr-bundle.json", description = "Output file") String output) {
+        try {
+            String finalToken = token;
+            if (finalToken == null && secret != null) {
+                finalToken = io.jfrtail.common.security.JwtLite.generateToken(secret, 60);
+            }
+            if (finalToken == null) {
+                System.err.println("Error: Secret or Token required for bundle.");
+                return 1;
+            }
+
+            System.out.println("Downloading bundle from " + host + ":" + port + "...");
+            java.net.URL url = java.net.URI.create("http://" + host + ":" + port + "/jfr/bundle?token=" + finalToken)
+                    .toURL();
+            java.nio.file.Files.copy(url.openStream(), java.nio.file.Paths.get(output),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("Bundle saved to: " + output);
+            return 0;
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            return 1;
+        }
+    }
+
     @Override
     public Integer call() throws Exception {
         CommandLine.usage(this, System.out);

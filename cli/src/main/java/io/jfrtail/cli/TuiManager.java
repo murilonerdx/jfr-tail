@@ -45,6 +45,12 @@ public class TuiManager {
     private boolean showJsonModal = false;
     private boolean filteringMode = false;
     private final StringBuilder filterInput = new StringBuilder();
+    private boolean showGC = true;
+    private boolean showLocks = true;
+    private boolean showExceptions = true;
+    private boolean showCPU = true;
+    private boolean commandMode = false;
+    private final StringBuilder commandInput = new StringBuilder();
 
     private long gcCount = 0;
     private long lockCount = 0;
@@ -261,10 +267,12 @@ public class TuiManager {
                 if (filteringMode) {
                     if (keyStroke.getKeyType() == KeyType.Enter || keyStroke.getKeyType() == KeyType.Escape) {
                         filteringMode = false;
-                    } else if (keyStroke.getKeyType() == KeyType.Backspace && filterInput.length() > 0) {
-                        filterInput.setLength(filterInput.length() - 1);
-                        selectedEventIndex = 0;
-                    } else if (keyStroke.getCharacter() != null) {
+                    } else if (keyStroke.getKeyType() == KeyType.Backspace) {
+                        if (filterInput.length() > 0) {
+                            filterInput.setLength(filterInput.length() - 1);
+                            selectedEventIndex = 0;
+                        }
+                    } else if (keyStroke.getCharacter() != null && !Character.isISOControl(keyStroke.getCharacter())) {
                         filterInput.append(keyStroke.getCharacter());
                         selectedEventIndex = 0;
                     }
@@ -272,10 +280,29 @@ public class TuiManager {
                     if (keyStroke.getKeyType() == KeyType.Escape || keyStroke.getKeyType() == KeyType.Enter) {
                         showJsonModal = false;
                     }
+                } else if (commandMode) {
+                    if (keyStroke.getKeyType() == KeyType.Enter) {
+                        String cmd = commandInput.toString().trim();
+                        if (cmd.equalsIgnoreCase(":q") || cmd.equalsIgnoreCase(":quit")
+                                || cmd.equalsIgnoreCase(":exit")) {
+                            running = false;
+                            break;
+                        }
+                        commandMode = false;
+                        commandInput.setLength(0);
+                    } else if (keyStroke.getKeyType() == KeyType.Escape) {
+                        commandMode = false;
+                        commandInput.setLength(0);
+                    } else if (keyStroke.getKeyType() == KeyType.Backspace) {
+                        if (commandInput.length() > 0) {
+                            commandInput.setLength(commandInput.length() - 1);
+                        }
+                    } else if (keyStroke.getCharacter() != null && !Character.isISOControl(keyStroke.getCharacter())) {
+                        commandInput.append(keyStroke.getCharacter());
+                    }
                 } else {
                     if (keyStroke.getKeyType() == KeyType.Escape) {
-                        running = false;
-                        break;
+                        // No longer exit on Escape
                     } else if (keyStroke.getKeyType() == KeyType.ArrowUp) {
                         if (selectedEventIndex > 0)
                             selectedEventIndex--;
@@ -285,9 +312,10 @@ public class TuiManager {
                         showJsonModal = true;
                     } else if (keyStroke.getCharacter() != null) {
                         char c = keyStroke.getCharacter();
-                        if (c == 'q') {
-                            running = false;
-                            break;
+                        if (c == ':') {
+                            commandMode = true;
+                            commandInput.setLength(0);
+                            commandInput.append(':');
                         } else if (c == 'c') {
                             clearData();
                         } else if (c == 's') {
@@ -296,6 +324,14 @@ public class TuiManager {
                             createIncidentBundle();
                         } else if (c == 'f') {
                             filteringMode = true;
+                        } else if (c == 'g' || c == 'G') {
+                            showGC = !showGC;
+                        } else if (c == 'l' || c == 'L') {
+                            showLocks = !showLocks;
+                        } else if (c == 'e' || c == 'E') {
+                            showExceptions = !showExceptions;
+                        } else if (c == 'p' || c == 'P') {
+                            showCPU = !showCPU;
                         }
                     }
                 }
@@ -421,6 +457,28 @@ public class TuiManager {
             tg.setBackgroundColor(TextColor.ANSI.BLACK);
         }
 
+        tg.setForegroundColor(TextColor.ANSI.CYAN);
+        tg.putString(2, 2, "FILTERS: ");
+        tg.setForegroundColor(showGC ? TextColor.ANSI.GREEN : TextColor.ANSI.RED);
+        tg.putString(11, 2, "GC");
+        tg.setForegroundColor(showLocks ? TextColor.ANSI.GREEN : TextColor.ANSI.RED);
+        tg.putString(15, 2, "LOCKS");
+        tg.setForegroundColor(showExceptions ? TextColor.ANSI.GREEN : TextColor.ANSI.RED);
+        tg.putString(22, 2, "EXC");
+        tg.setForegroundColor(showCPU ? TextColor.ANSI.GREEN : TextColor.ANSI.RED);
+        tg.putString(27, 2, "CPU");
+
+        tg.setForegroundColor(TextColor.ANSI.CYAN);
+        tg.putString(2, 2, "FILTERS: ");
+        tg.setForegroundColor(showGC ? TextColor.ANSI.GREEN : TextColor.ANSI.RED);
+        tg.putString(11, 2, "GC");
+        tg.setForegroundColor(showLocks ? TextColor.ANSI.GREEN : TextColor.ANSI.RED);
+        tg.putString(15, 2, "LOCKS");
+        tg.setForegroundColor(showExceptions ? TextColor.ANSI.GREEN : TextColor.ANSI.RED);
+        tg.putString(22, 2, "EXC");
+        tg.setForegroundColor(showCPU ? TextColor.ANSI.GREEN : TextColor.ANSI.RED);
+        tg.putString(27, 2, "CPU");
+
         if (showSpringPanel && actuatorClient != null) {
             drawSpringPanel(tg, width, height);
         } else {
@@ -430,9 +488,11 @@ public class TuiManager {
         // Footer
         tg.setBackgroundColor(TextColor.ANSI.WHITE);
         tg.setForegroundColor(TextColor.ANSI.BLACK);
-        String footer = " Q:Quit | C:Clear | S:Spring | B:Bundle | F:Filter | Enter:Detail ";
+        String footer = " : (Cmd) | C:Clear | S:Spring | B:Bundle | F:Filter | G/L/E/P:Toggle | Enter:Detail ";
         if (filteringMode) {
             footer = " TYPE TO FILTER... [ENTER/ESC to finish] | Buffer: " + filterInput.toString();
+        } else if (commandMode) {
+            footer = " COMMAND: " + commandInput.toString() + " [ENTER to run, ESC to cancel] ";
         }
         tg.putString(0, height - 1, String.format("%-" + width + "s", footer));
 
@@ -455,10 +515,21 @@ public class TuiManager {
         // Filter logic
         List<JfrEvent> filtered = events.stream()
                 .filter(e -> {
+                    String type = e.getEvent() != null ? e.getEvent().toLowerCase() : "";
+
+                    if (!showGC && type.contains("garbagecollection"))
+                        return false;
+                    if (!showLocks && (type.contains("jmonitor") || type.contains("threadpark")))
+                        return false;
+                    if (!showExceptions && type.contains("exception"))
+                        return false;
+                    if (!showCPU && type.contains("cpuload"))
+                        return false;
+
                     if (filterInput.length() == 0)
                         return true;
+
                     String f = filterInput.toString().toLowerCase();
-                    String type = e.getEvent() != null ? e.getEvent().toLowerCase() : "";
                     String thread = e.getThread() != null ? e.getThread().toLowerCase() : "";
                     return type.contains(f) || thread.contains(f);
                 })
@@ -575,10 +646,21 @@ public class TuiManager {
         // Get selected event
         List<JfrEvent> filtered = events.stream()
                 .filter(e -> {
+                    String type = e.getEvent() != null ? e.getEvent().toLowerCase() : "";
+
+                    if (!showGC && type.contains("garbagecollection"))
+                        return false;
+                    if (!showLocks && (type.contains("jmonitor") || type.contains("threadpark")))
+                        return false;
+                    if (!showExceptions && type.contains("exception"))
+                        return false;
+                    if (!showCPU && type.contains("cpuload"))
+                        return false;
+
                     if (filterInput.length() == 0)
                         return true;
+
                     String f = filterInput.toString().toLowerCase();
-                    String type = e.getEvent() != null ? e.getEvent().toLowerCase() : "";
                     String thread = e.getThread() != null ? e.getThread().toLowerCase() : "";
                     return type.contains(f) || thread.contains(f);
                 })

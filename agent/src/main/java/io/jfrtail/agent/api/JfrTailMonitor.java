@@ -1,6 +1,7 @@
 package io.jfrtail.agent.api;
 
 import io.jfrtail.agent.server.EmbeddedServer;
+import io.jfrtail.common.CollectorProfile;
 import io.jfrtail.common.JfrEvent;
 import io.jfrtail.common.JsonUtils;
 import jdk.jfr.consumer.RecordedEvent;
@@ -20,10 +21,13 @@ import java.util.concurrent.Executors;
 public class JfrTailMonitor {
     private static JfrTailMonitor instance;
     private final StatsManager statsManager = new StatsManager();
+    private AlertManager alertManager;
+
     private EmbeddedServer webServer;
     private RecordingStream recordingStream;
     private final Set<PrintWriter> tcpClients = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final ExecutorService executor = Executors.newCachedThreadPool();
+    private CollectorProfile profile = CollectorProfile.BALANCED;
 
     public static synchronized JfrTailMonitor getInstance() {
         if (instance == null) {
@@ -44,6 +48,14 @@ public class JfrTailMonitor {
 
     public void start(int webPort, int tcpPort, String secret, boolean statsEnabled, boolean dashboardEnabled)
             throws IOException {
+        start(webPort, tcpPort, secret, statsEnabled, dashboardEnabled, CollectorProfile.BALANCED);
+    }
+
+    public void start(int webPort, int tcpPort, String secret, boolean statsEnabled, boolean dashboardEnabled,
+            CollectorProfile profile)
+            throws IOException {
+        this.profile = profile != null ? profile : CollectorProfile.BALANCED;
+
         // 0. Security Setup
         if (secret == null || secret.isEmpty()) {
             // Check System Prop
@@ -135,17 +147,25 @@ public class JfrTailMonitor {
         // Lower thresholds to zero (capture all) for maximum visibility into contention
         recordingStream.enable("jdk.GarbageCollection");
         recordingStream.enable("jdk.GCHeapSummary").withPeriod(Duration.ofSeconds(1));
-        recordingStream.enable("jdk.MetaspaceSummary").withPeriod(Duration.ofSeconds(5));
-        recordingStream.enable("jdk.ObjectAllocationOutsideTLAB").withThreshold(Duration.ZERO);
 
-        recordingStream.enable("jdk.JavaMonitorEnter").withThreshold(Duration.ZERO);
-        recordingStream.enable("jdk.JavaMonitorWait").withThreshold(Duration.ZERO);
-        recordingStream.enable("jdk.ThreadPark").withThreshold(Duration.ZERO);
-        recordingStream.enable("jdk.ExceptionThrown");
+        if (profile == CollectorProfile.HIGH || profile == CollectorProfile.BALANCED) {
+            recordingStream.enable("jdk.ExceptionThrown");
+            recordingStream.enable("jdk.JavaMonitorEnter").withThreshold(Duration.ZERO);
+            recordingStream.enable("jdk.ThreadPark").withThreshold(Duration.ZERO);
+        }
+
+        if (profile == CollectorProfile.HIGH) {
+            recordingStream.enable("jdk.ObjectAllocationOutsideTLAB").withThreshold(Duration.ZERO);
+            recordingStream.enable("jdk.MetaspaceSummary").withPeriod(Duration.ofSeconds(5));
+        }
+
         recordingStream.enable("jdk.CPULoad").withPeriod(Duration.ofSeconds(1));
         recordingStream.setOrdered(false);
 
         recordingStream.onEvent(this::processEvent);
+
+        // 4. Initialize AlertManager if configuration exists (placeholder for now)
+        this.alertManager = new AlertManager();
 
         executor.submit(() -> {
             try {
@@ -190,6 +210,11 @@ public class JfrTailMonitor {
         // Update Stats
         statsManager.accept(jfrEvent);
 
+        // Check Alerts
+        if (alertManager != null) {
+            alertManager.check(jfrEvent);
+        }
+
         // Broadcast to TCP Clients
         if (!tcpClients.isEmpty()) {
             try {
@@ -230,5 +255,13 @@ public class JfrTailMonitor {
         if (webServer != null)
             webServer.stop();
         executor.shutdownNow();
+    }
+
+    public StatsManager getStatsManager() {
+        return statsManager;
+    }
+
+    public AlertManager getAlertManager() {
+        return alertManager;
     }
 }

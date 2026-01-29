@@ -37,6 +37,7 @@ public class EmbeddedServer {
         }
         if (dashboardEnabled) {
             server.createContext("/jfr/dashboard", new AuthMiddleware(new DashboardHandler()));
+            server.createContext("/jfr/bundle", new AuthMiddleware(new BundleHandler()));
         }
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
@@ -74,14 +75,19 @@ public class EmbeddedServer {
             }
 
             // Extract Token
+            String token = null;
             String auth = exchange.getRequestHeaders().getFirst("Authorization");
-            if (auth == null || !auth.startsWith("Bearer ")) {
-                send401(exchange);
-                return;
+            if (auth != null && auth.startsWith("Bearer ")) {
+                token = auth.substring(7);
+            } else {
+                // Try query param
+                String query = exchange.getRequestURI().getQuery();
+                if (query != null && query.contains("token=")) {
+                    token = query.split("token=")[1].split("&")[0];
+                }
             }
 
-            String token = auth.substring(7);
-            if (!io.jfrtail.common.security.JwtLite.verifyToken(token, secret)) {
+            if (token == null || !io.jfrtail.common.security.JwtLite.verifyToken(token, secret)) {
                 send401(exchange);
                 return;
             }
@@ -162,29 +168,77 @@ public class EmbeddedServer {
                         <title>JFR-Tail Dashboard</title>
                         <meta http-equiv="refresh" content="2">
                         <style>
-                            body { font-family: monospace; background: #222; color: #eee; padding: 20px; }
-                            .metric { font-size: 1.5em; margin: 10px; }
-                            pre { background: #333; padding: 10px; border-radius: 5px; }
+                            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f1f5f9; padding: 20px; line-height: 1.6; }
+                            .container { max-width: 1200px; margin: 0 auto; }
+                            h1 { color: #38bdf8; border-bottom: 2px solid #334155; padding-bottom: 10px; }
+                            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+                            .card { background: #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #334155; }
+                            .card h3 { margin-top: 0; color: #94a3b8; font-size: 0.9rem; text-transform: uppercase; }
+                            .metric { font-size: 2.5rem; font-weight: bold; color: #f8fafc; }
+                            .subtext { color: #64748b; font-size: 0.8rem; }
+                            pre { background: #020617; padding: 15px; border-radius: 8px; overflow-x: auto; border: 1px solid #1e293b; color: #10b981; font-size: 0.85rem; }
+                            .btn { background: #38bdf8; color: #0f172a; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block; }
+                            .btn:hover { background: #7dd3fc; }
                         </style>
                     </head>
                     <body>
-                        <h1>JFR-Tail Embedded Dashboard</h1>
-                        <div id="app">Loading...</div>
+                        <div class="container">
+                            <h1>JFR-Tail Live Monitor</h1>
+                            <div class="grid">
+                                <div class="card">
+                                    <h3>GC Events</h3>
+                                    <div id="gc-count" class="metric">-</div>
+                                    <div id="last-gc" class="subtext">Last Pause: - ms</div>
+                                </div>
+                                <div class="card">
+                                    <h3>Exceptions</h3>
+                                    <div id="exc-count" class="metric">-</div>
+                                    <div class="subtext">Proactive tracking enabled</div>
+                                </div>
+                                <div class="card">
+                                    <h3>Lock Contention</h3>
+                                    <div id="lock-count" class="metric">-</div>
+                                    <div class="subtext">Threads waiting</div>
+                                </div>
+                                <div class="card">
+                                    <h3>Heap Used</h3>
+                                    <div id="heap-used" class="metric">- MB</div>
+                                    <div id="heap-committed" class="subtext">Committed: - MB</div>
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 20px;">
+                                <a href="#" id="bundle-btn" class="btn">Download Incident Bundle</a>
+                            </div>
+
+                            <div class="card">
+                                <h3>Latest Event Stream</h3>
+                                <pre id="last-event">Waiting for events...</pre>
+                            </div>
+                        </div>
+
                         <script>
-                            fetch('/jfr/stats', {
-                                headers: {
-                                    'Authorization': 'Bearer ' + (new URLSearchParams(window.location.search)).get('token')
-                                }
-                            })
-                            .then(r => r.json())
-                            .then(data => {
-                                document.getElementById('app').innerHTML =
-                                    '<div class="metric">GC Events: ' + data.metrics.gc_count + '</div>' +
-                                    '<div class="metric">Lock Events: ' + data.metrics.lock_count + '</div>' +
-                                    '<div class="metric">Exceptions: ' + data.metrics.exception_count + '</div>' +
-                                    '<h3>Last Event</h3>' +
-                                    '<pre>' + JSON.stringify(data.last_event, null, 2) + '</pre>';
-                            });
+                            const token = (new URLSearchParams(window.location.search)).get('token');
+                            document.getElementById('bundle-btn').href = '/jfr/bundle?token=' + token;
+
+                            function update() {
+                                fetch('/jfr/stats', {
+                                    headers: { 'Authorization': 'Bearer ' + token }
+                                })
+                                .then(r => r.json())
+                                .then(data => {
+                                    document.getElementById('gc-count').innerText = data.metrics.gc_count;
+                                    document.getElementById('last-gc').innerText = 'Last Pause: ' + data.metrics.last_gc_pause_ms + ' ms';
+                                    document.getElementById('exc-count').innerText = data.metrics.exception_count;
+                                    document.getElementById('lock-count').innerText = data.metrics.lock_count;
+                                    document.getElementById('heap-used').innerText = data.metrics.heap_used_mb + ' MB';
+                                    document.getElementById('heap-committed').innerText = 'Committed: ' + data.metrics.heap_committed_mb + ' MB';
+                                    document.getElementById('last-event').innerText = JSON.stringify(data.last_event, null, 2);
+                                })
+                                .catch(err => console.error('Fetch error:', err));
+                            }
+                            setInterval(update, 2000);
+                            update();
                         </script>
                     </body>
                     </html>
@@ -193,6 +247,47 @@ public class EmbeddedServer {
             byte[] bytes = html.getBytes();
             exchange.sendResponseHeaders(200, bytes.length);
             try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        }
+    }
+
+    private class BundleHandler implements com.sun.net.httpserver.HttpHandler {
+        @Override
+        public void handle(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+            // Re-check auth if token is in query param for easier download
+            String query = exchange.getRequestURI().getQuery();
+            String token = null;
+            if (query != null && query.contains("token=")) {
+                token = query.split("token=")[1].split("&")[0];
+            } else {
+                String auth = exchange.getRequestHeaders().getFirst("Authorization");
+                if (auth != null && auth.startsWith("Bearer ")) {
+                    token = auth.substring(7);
+                }
+            }
+
+            if (token == null || !io.jfrtail.common.security.JwtLite.verifyToken(token, secret)) {
+                exchange.sendResponseHeaders(401, -1);
+                return;
+            }
+
+            java.util.Map<String, Object> bundle = java.util.Map.of(
+                    "timestamp", java.time.Instant.now().toString(),
+                    "snapshot", statsManager.getSnapshot(),
+                    "history", statsManager.getHistory(),
+                    "system", java.util.Map.of(
+                            "os", System.getProperty("os.name"),
+                            "java_version", System.getProperty("java.version"),
+                            "available_processors", Runtime.getRuntime().availableProcessors(),
+                            "total_memory_mb", Runtime.getRuntime().totalMemory() / (1024 * 1024)));
+
+            String json = io.jfrtail.common.JsonUtils.toJson(bundle);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=jfr-incident-bundle.json");
+            byte[] bytes = json.getBytes();
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (java.io.OutputStream os = exchange.getResponseBody()) {
                 os.write(bytes);
             }
         }

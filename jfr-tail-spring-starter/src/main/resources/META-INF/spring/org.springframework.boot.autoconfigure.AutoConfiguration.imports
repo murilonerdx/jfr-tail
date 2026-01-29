@@ -1,1 +1,2 @@
 io.jfrtail.spring.autoconfigure.JfrTailAutoConfiguration
+io.jfrtail.spring.autoconfigure.JfrTailMetricsAutoConfiguration
